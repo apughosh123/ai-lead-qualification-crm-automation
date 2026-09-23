@@ -1,0 +1,894 @@
+{
+  "name": "Lead Qualification & CRM Router",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Lead Qualification Form",
+        "formDescription": "Submit your details to help us understand your business needs and find the right solution for you.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Full Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company Website"
+            },
+            {
+              "fieldLabel": "Job Title",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company Size",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1-10"
+                  },
+                  {
+                    "option": "11-50"
+                  },
+                  {
+                    "option": "51-200"
+                  },
+                  {
+                    "option": "201-500"
+                  },
+                  {
+                    "option": "500+"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "What do you need help with?",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -496,
+        -176
+      ],
+      "id": "65f5a283-0952-41b8-9a3a-e1f7e12175c5",
+      "name": "Lead Qualification Form",
+      "webhookId": "4b3e2ce0-8d9c-4a52-9c92-24b624321771"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d39d6873-77a1-40bd-b4db-ff1655a25e2f",
+              "name": "lead_source",
+              "value": "Website Form",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -320,
+        -176
+      ],
+      "id": "036654d0-b1ae-46f7-8d8a-115f2f82dae5",
+      "name": "Data Validation & Preparation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-5.2\",\n  \"max_tokens\": 500,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an AI lead qualification assistant. Return ONLY a valid JSON object. Do not provide reasoning, explanation, markdown, code fences, or any other text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this lead:\\n\\nName: {{$json['Full Name']}}\\nEmail: {{$json['Email']}}\\nCompany: {{$json['Company Name']}}\\nWebsite: {{$json['Company Website']}}\\nJob Title: {{$json['Job Title']}}\\nCompany Size: {{$json['Company Size']}}\\nNeed: {{$json['What do you need help with?']}}\\n\\nReturn a JSON object with exactly these fields:\\n{\\n  \\\"qualification\\\": \\\"Hot, Warm, or Cold\\\",\\n  \\\"lead_score\\\": 0,\\n  \\\"reason\\\": \\\"short explanation\\\",\\n  \\\"recommended_action\\\": \\\"next action for sales team\\\"\\n}\\n\\nThe lead_score must be a number from 0 to 100.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -144,
+        -176
+      ],
+      "id": "6d9b168f-b092-428c-b172-002cdb3d51f9",
+      "name": "AI Lead Qualification"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.choices[0].message.content;\n\nconst result = JSON.parse(response);\n\nreturn [\n  {\n    json: result\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -176
+      ],
+      "id": "c46de4a9-d39b-494b-99e1-7907ecd1d138",
+      "name": "Parse AI Qualification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "73e5c9df-924d-4f05-a135-1926f3e8a003",
+              "leftValue": "={{ $json.lead_score }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        192,
+        -176
+      ],
+      "id": "82134997-b6db-4a46-adde-1b526c709f67",
+      "name": "Lead Score Routing"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98",
+          "mode": "list",
+          "cachedResultName": "Lead Qualification CRM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Full Name": "={{ $('Lead Qualification Form').item.json['Full Name'] }}",
+            "Email": "={{ $('Lead Qualification Form').item.json['Email'] }}",
+            "Company Name": "={{ $('Lead Qualification Form').item.json['Company Name'] }}",
+            "Company Website": "={{ $('Lead Qualification Form').item.json['Company Website'] }}",
+            "Job Title": "={{ $('Lead Qualification Form').item.json['Job Title'] }}",
+            "Company Size": "={{ $('Lead Qualification Form').item.json['Company Size'] }}",
+            "Need": "={{ $('Lead Qualification Form').item.json['What do you need help with?'] }}",
+            "Qualification": "={{ $json.qualification }}",
+            "Lead Score": "={{ $json.lead_score }}",
+            "Reason": "={{ $json.reason }}",
+            "Recommended Action": "={{ $json.recommended_action }}",
+            "Lead Source": "={{ $('Data Validation & Preparation').item.json.lead_source }}",
+            "Submitted At": "={{ $('Lead Qualification Form').item.json.submittedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Full Name",
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Website",
+              "displayName": "Company Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Size",
+              "displayName": "Company Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Need",
+              "displayName": "Need",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Qualification",
+              "displayName": "Qualification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recommended Action",
+              "displayName": "Recommended Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Source",
+              "displayName": "Lead Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Submitted At",
+              "displayName": "Submitted At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        400,
+        -352
+      ],
+      "id": "87dfe0a5-36a2-4758-87b5-5240882c5832",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "5dMADFJGlBXeaF8v",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "20e3a3c4-f11d-4a3e-a96f-ef630a740395",
+              "leftValue": "={{ $json.lead_score }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        -64
+      ],
+      "id": "3623ef7b-cace-48f3-9419-00eea4bc7742",
+      "name": "Warm Lead Routing"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98",
+          "mode": "list",
+          "cachedResultName": "Lead Qualification CRM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Full Name": "={{ $('Lead Qualification Form').item.json['Full Name'] }}",
+            "Email": "={{ $('Lead Qualification Form').item.json['Email'] }}",
+            "Company Name": "={{ $('Lead Qualification Form').item.json['Company Name'] }}",
+            "Company Website": "={{ $('Lead Qualification Form').item.json['Company Website'] }}",
+            "Job Title": "={{ $('Lead Qualification Form').item.json['Job Title'] }}",
+            "Company Size": "={{ $('Lead Qualification Form').item.json['Company Size'] }}",
+            "Need": "={{ $('Lead Qualification Form').item.json['What do you need help with?'] }}",
+            "Qualification": "={{ $json.qualification }}",
+            "Lead Score": "={{ $json.lead_score }}",
+            "Reason": "={{ $json.reason }}",
+            "Recommended Action": "={{ $json.recommended_action }}",
+            "Lead Source": "={{ $('Data Validation & Preparation').item.json.lead_source }}",
+            "Submitted At": "={{ $('Lead Qualification Form').item.json.submittedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Full Name",
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Website",
+              "displayName": "Company Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Size",
+              "displayName": "Company Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Need",
+              "displayName": "Need",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Qualification",
+              "displayName": "Qualification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recommended Action",
+              "displayName": "Recommended Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Source",
+              "displayName": "Lead Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Submitted At",
+              "displayName": "Submitted At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        -144
+      ],
+      "id": "493af8fc-1b9f-41f8-b9ff-56de2dc04b2d",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "5dMADFJGlBXeaF8v",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98",
+          "mode": "list",
+          "cachedResultName": "Lead Qualification CRM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UG6DLn0CcUgE3Fcl2sR7qHB-lg9hv15q3T_4BGZeN98/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Full Name": "={{ $('Lead Qualification Form').item.json['Full Name'] }}",
+            "Email": "={{ $('Lead Qualification Form').item.json['Email'] }}",
+            "Company Name": "={{ $('Lead Qualification Form').item.json['Company Name'] }}",
+            "Company Website": "={{ $('Lead Qualification Form').item.json['Company Website'] }}",
+            "Job Title": "={{ $('Lead Qualification Form').item.json['Job Title'] }}",
+            "Company Size": "={{ $('Lead Qualification Form').item.json['Company Size'] }}",
+            "Need": "={{ $('Lead Qualification Form').item.json['What do you need help with?'] }}",
+            "Qualification": "={{ $json.qualification }}",
+            "Lead Score": "={{ $json.lead_score }}",
+            "Reason": "={{ $json.reason }}",
+            "Recommended Action": "={{ $json.recommended_action }}",
+            "Lead Source": "={{ $('Data Validation & Preparation').item.json.lead_source }}",
+            "Submitted At": "={{ $('Lead Qualification Form').item.json.submittedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Full Name",
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Website",
+              "displayName": "Company Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Size",
+              "displayName": "Company Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Need",
+              "displayName": "Need",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Qualification",
+              "displayName": "Qualification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recommended Action",
+              "displayName": "Recommended Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Source",
+              "displayName": "Lead Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Submitted At",
+              "displayName": "Submitted At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        48
+      ],
+      "id": "dcf15a20-53e0-490a-b15b-4774afe95825",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "5dMADFJGlBXeaF8v",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Lead Qualification Form').item.json['Email'] }}",
+        "subject": "Let's discuss your automation needs",
+        "message": "=Hi {{$('Lead Qualification Form').item.json['Full Name']}},  Thanks for sharing your automation requirements with us.  Based on the information you provided, it looks like there are some great opportunities to improve your current processes with automation.  We'd love to learn more about your workflow, current tools, and goals so we can suggest the right solution.  Would you be available for a short discovery call?  Best regards, AI Automation Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        608,
+        -352
+      ],
+      "id": "e6c82114-2182-420d-baaa-60b1bf25e570",
+      "name": "Send a message",
+      "webhookId": "ef2ad02e-b6e2-4533-8736-5267dab2638b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "BCOxRgIdUSZNxlKq",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Lead Qualification Form').item.json['Email'] }}\n",
+        "subject": "Let's explore your automation requirements",
+        "message": "=Hi {{$('Lead Qualification Form').item.json['Full Name']}},  Thanks for reaching out and sharing your business requirements.  We understand that you're currently exploring ways to improve your processes through automation.  We'd be happy to learn more about your current workflow, tools, and goals and explore a solution that fits your needs.  If you're interested, we can schedule a short discovery call to discuss your requirements.  Best regards, AI Automation Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        -144
+      ],
+      "id": "bfd977f9-a21f-401c-a51d-988b6f1c0f9f",
+      "name": "Send a message1",
+      "webhookId": "aa3587f3-88de-40ec-b7ff-215e4d1ccb6e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "BCOxRgIdUSZNxlKq",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Qualification Form": {
+      "main": [
+        [
+          {
+            "node": "Data Validation & Preparation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Validation & Preparation": {
+      "main": [
+        [
+          {
+            "node": "AI Lead Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Lead Qualification": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Qualification": {
+      "main": [
+        [
+          {
+            "node": "Lead Score Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Score Routing": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Warm Lead Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Warm Lead Routing": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ee44d49d-7775-4efa-9488-f0887bd65832",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a2722732ac6e7a4dd8b19a9a2e10278bebb09f92074d992974928382839956ee"
+  },
+  "nodeGroups": [],
+  "id": "I2PuSfd6S9b7xx4B",
+  "tags": []
+}
